@@ -259,8 +259,9 @@ static void write_flags_docs(FILE *stream, const Y_CmdMgr *mgr){
         const Y_CmdFlag *flag = mgr->flags + i;
 
         write_tabs(stream, 1);
-        WFMT("-%s:", flag->flag);
-
+        WFMT("-%s:\n", flag->flag);
+        
+        write_tabs(stream, 2);
         write_doc(stream, &flag->doc, 2);
         WS("\n");
         write_type_docs(stream, flag->input_type, 2);
