@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include <ylang.h>
 #include Y_CMDARGS
 #include Y_UTIL
@@ -6,7 +8,7 @@
 #define WC(CHAR) fputc(CHAR, stream)
 #define WFMT(FMT, ...) fprintf(stream, FMT,##__VA_ARGS__)
 
-static bool is_filepath(const char *input);
+static bool is_file(const char *input);
 
 static void write_doc(FILE *stream, const Y_CmdDoc *doc, unsigned int tabs);
 static void write_tabs(FILE *stream, unsigned int tabs);
@@ -21,13 +23,14 @@ static void write_rest_docs(FILE *stream, const Y_CmdMgr *mgr);
 static void write_rest_amout(FILE *stream, const Y_CmdRest *rest);
 static void write_type_docs(FILE *stream, const Y_CmdInputType *type, unsigned int tabs);
 static void write_flags_docs(FILE *stream, const Y_CmdMgr *mgr);
+static bool str_overlaps(const char *first, const char *second);
 
 const Y_CmdInputType *y_cmd_type_file = &(Y_CmdInputType){
     .doc = {
         .name = "file",
         .description = "path to the file",
     },
-    .is_satisfies = is_filepath,
+    .is_satisfies = is_file,
 };
 
 void y_cmd_mgr_write_docs(FILE *stream, const Y_CmdMgr *mgr){
@@ -57,9 +60,24 @@ void y_cmd_mgr_write_docs(FILE *stream, const Y_CmdMgr *mgr){
     fflush(stream);
 }
 
+bool y_cmd_mgr_flags_overlapped(const Y_CmdMgr *mgr){
+    if(mgr == NULL){
+        Y_FAULT("%s(): mgr == NULL", __func__);
+    }
+
+    for (unsigned i = 0; i < mgr->flags_cnt; i++){
+        for (unsigned j = 0; j < i; j++){
+            if(str_overlaps(mgr->flags[i].flag, mgr->flags[j].flag)){
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 //static
 
-static bool is_filepath(const char *input){
+static bool is_file(const char *input){
     if(input){
         Y_TODO("is_filepath()");
         return true;
@@ -120,6 +138,8 @@ static void write_doc_description(FILE *stream, const char *descritpion, unsigne
 }
 
 static void write_required_arguments_usage(FILE *stream, const Y_CmdMgr *mgr){
+    if(!mgr) return;
+
     for(unsigned int i = 0; i < mgr->requred_cnt; i++){
         const Y_CmdRequred *required = mgr->requred + i;
 
@@ -140,6 +160,7 @@ static void write_required_arguments_usage(FILE *stream, const Y_CmdMgr *mgr){
 }
 
 static void write_flags_usage(FILE *stream, const Y_CmdMgr *mgr){
+    if(!mgr) return;
     for(unsigned int i = 0; i < mgr->flags_cnt; i++){
         const Y_CmdFlag *flag = mgr->flags + i;
 
@@ -165,27 +186,27 @@ static void write_flags_usage(FILE *stream, const Y_CmdMgr *mgr){
 }
 
 static void write_rest_usage(FILE *stream, const Y_CmdMgr *mgr){
-    if(mgr->rest){
-        WS(" [");
-        write_doc_name(stream, mgr->rest->doc.name);
-        WC(':');
-        if(mgr->rest->input_type){
-            write_doc_name(stream, mgr->rest->input_type->doc.name);
-        }
-        else{
-            WS("NULL");
-        }
-        WFMT(" ... (>= %u", mgr->rest->min_cout);
-        if(mgr->rest->max_cout >= 0){
-            WFMT(", < %i", mgr->rest->max_cout + 1);
-        }
-        WS(" items)");
-        WC(']');
+    if(!mgr || mgr->rest) return;
+    
+    WS(" [");
+    write_doc_name(stream, mgr->rest->doc.name);
+    WC(':');
+    if(mgr->rest->input_type){
+        write_doc_name(stream, mgr->rest->input_type->doc.name);
     }
+    else{
+        WS("NULL");
+    }
+    WFMT(" ... (>= %u", mgr->rest->min_cout);
+    if(mgr->rest->max_cout >= 0){
+        WFMT(", < %i", mgr->rest->max_cout + 1);
+    }
+    WS(" items)");
+    WC(']');
 }
 
 static void write_required_docs(FILE *stream, const Y_CmdMgr *mgr){
-    if(!mgr->requred_cnt) return;
+    if(!mgr || !mgr->requred_cnt) return;
 
     WS("REQUIRED:\n");
     for (unsigned int i = 0; i < mgr->requred_cnt; i++){
@@ -204,7 +225,7 @@ static void write_required_docs(FILE *stream, const Y_CmdMgr *mgr){
 }
 
 static void write_rest_docs(FILE *stream, const Y_CmdMgr *mgr){
-    if(!mgr->rest) return;
+    if(!mgr || !mgr->rest) return;
 
     WS("VARIADIC:\n");
     write_tabs(stream, 1);
@@ -246,7 +267,7 @@ static void write_type_docs(FILE *stream, const Y_CmdInputType *type, unsigned i
         write_doc(stream, &type->doc, tabs + 1);
     }
     else{
-        WS("NULL");
+        WS("NULL\n");
     }
 }
 
@@ -260,9 +281,9 @@ static void write_flags_docs(FILE *stream, const Y_CmdMgr *mgr){
 
         write_tabs(stream, 1);
         WFMT("-%s:\n", flag->flag);
-        
+
         write_tabs(stream, 2);
-        write_doc(stream, &flag->doc, 2);
+        write_doc(stream, &flag->doc, 3);
         WS("\n");
         write_type_docs(stream, flag->input_type, 2);
 
@@ -270,4 +291,18 @@ static void write_flags_docs(FILE *stream, const Y_CmdMgr *mgr){
             WS("\n");
         }
     }
+}
+
+static bool str_overlaps(const char *first, const char *second){
+    bool result = false;
+    while (*first && *second){
+        if(*first++ == *second++){
+            result = true;
+        }
+        else{
+            result = false;
+        }
+    }
+
+    return result;
 }

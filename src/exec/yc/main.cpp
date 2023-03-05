@@ -53,10 +53,11 @@ int main(int argc, char const *argv[]){
     mgr.flags = flags;
     mgr.flags_cnt = Y_ARRLEN(flags);
     mgr.rest = &rest;
-
+    assert(!y_cmd_mgr_flags_overlapped(&mgr));
 
     y_cmd_mgr_write_docs(stdout, &mgr);
-    
+
+
     
     return 0;
 }
