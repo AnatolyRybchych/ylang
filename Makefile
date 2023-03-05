@@ -4,7 +4,11 @@ INCLUDE := -Iinclude
 LIBS    := 
 CARGS   := $(INCLUDE) -ggdb -Wall -Wextra -pedantic #-Werror
 
-yc_obj += exec/yc/main.o
+#submodules
+cmd_obj += cmdargs.o
+
+#executables
+yc_obj += exec/yc/main.o $(cmd_obj)
 
 all: bin/yc
 
