@@ -20,6 +20,7 @@ extern const Y_CmdInputType *y_cmd_type_file;
 
 void y_cmd_mgr_write_docs(FILE *stream, const Y_CmdMgr *mgr);
 bool y_cmd_mgr_flags_overlapped(const Y_CmdMgr *mgr);
+bool y_cmd_mgr_try_cpature(Y_CmdMgr *mgr, int argc, const char **argv, FILE *error_stream, bool write_errors);
 
 struct Y_CmdDoc{
     const char *name;

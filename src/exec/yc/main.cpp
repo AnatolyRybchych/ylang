@@ -11,17 +11,17 @@ int main(int argc, char const *argv[]){
     mgr.doc.name = "yc";
     mgr.doc.description = "ylang compiller";
 
-    Y_CmdRequred required[] = {
-        (Y_CmdRequred){
-            .data = NULL,
-            .on_capture = NULL,
-            .input_type = y_cmd_type_file,
-            .doc = {
-                .name = "required_argument",
-                .description = "here is required argument"
-            },
-        }
-    };
+    // Y_CmdRequred required[] = {
+    //     (Y_CmdRequred){
+    //         .data = NULL,
+    //         .on_capture = NULL,
+    //         .input_type = y_cmd_type_file,
+    //         .doc = {
+    //             .name = "required_argument",
+    //             .description = "here is required argument"
+    //         },
+    //     }
+    // };
 
     Y_CmdFlag flags[] = {
         (Y_CmdFlag){   
@@ -33,7 +33,7 @@ int main(int argc, char const *argv[]){
                 .name = "output_file",
                 .description = "path to output file"
             },
-        },
+        }
     };
 
     Y_CmdRest rest = {
@@ -48,16 +48,21 @@ int main(int argc, char const *argv[]){
         },
     };
 
-    mgr.requred = required;
-    mgr.requred_cnt = Y_ARRLEN(required);
+    // mgr.requred = required;
+    // mgr.requred_cnt = Y_ARRLEN(required);
     mgr.flags = flags;
     mgr.flags_cnt = Y_ARRLEN(flags);
     mgr.rest = &rest;
     assert(!y_cmd_mgr_flags_overlapped(&mgr));
 
-    y_cmd_mgr_write_docs(stdout, &mgr);
+    //y_cmd_mgr_write_docs(stdout, &mgr);
 
+    if(y_cmd_mgr_try_cpature(&mgr, argc, argv, stdout, true)){
+        return 0;
+    }
+    else{
+        return 1;
+    }
 
-    
     return 0;
 }

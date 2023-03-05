@@ -24,6 +24,8 @@ static void write_rest_amout(FILE *stream, const Y_CmdRest *rest);
 static void write_type_docs(FILE *stream, const Y_CmdInputType *type, unsigned int tabs);
 static void write_flags_docs(FILE *stream, const Y_CmdMgr *mgr);
 static bool str_overlaps(const char *first, const char *second);
+static Y_CmdFlag *get_flag(Y_CmdMgr *mgr, const char *flag);
+static bool is_satisfies(const Y_CmdInputType *type, const char *input);
 
 const Y_CmdInputType *y_cmd_type_file = &(Y_CmdInputType){
     .doc = {
@@ -74,6 +76,93 @@ bool y_cmd_mgr_flags_overlapped(const Y_CmdMgr *mgr){
     }
     return false;
 }
+
+static int pseudo_fprintf(FILE *file, const char *fmt, ...){
+    (void)file;//unused
+    (void)fmt;//unused
+    return 0;
+}
+
+//TODO: more convinient error messages
+//TODO?: devide into different parts
+bool y_cmd_mgr_try_cpature(Y_CmdMgr *mgr, int argc, const char **argv, FILE *error_stream, bool write_errors){
+    if(mgr == NULL) Y_FAULT("%s(): mgr == NULL", __func__);
+    if(argv == NULL) Y_FAULT("%s(): argv == NULL", __func__);
+    if(argc <= 0) Y_FAULT("%s(): argc == %i", __func__, argc);
+    
+    int (*log)(FILE *file, const char *fmt, ...) = write_errors ? fprintf : pseudo_fprintf;
+
+    unsigned curr_required = 0;
+    unsigned cnt_variadic = 0;
+    
+    for(int i = 1; i < argc; i++){
+        const char *arg = argv[i];
+        if(*arg == 0){
+            log(error_stream, "WARNING: empty argument\n");
+        }
+        else if(*arg == '-'){
+            Y_CmdFlag *flag = get_flag(mgr, arg + 1);
+
+            if(!flag){
+                log(error_stream, "ERROR: unknown flag \"%s\"\n", arg);
+                return false;
+            }
+            if(!flag->input_type){
+                if(flag->on_capture) flag->on_capture(flag->data, "");
+                continue;
+            }
+            if(++i >= argc){
+                log(error_stream, "ERROR: missing parameter for flag [%s]\n", arg);
+                return false;
+            }
+            const char *param = argv[i];
+
+            if(!is_satisfies(flag->input_type, param)){
+                log(error_stream, "ERROR: \"%s\" parameter for flag \"-%s\" is not satisfied for type \"%s\"\n", param, flag->doc.name, flag->input_type->doc.name);
+                return false;
+            }
+            if(flag->on_capture) flag->on_capture(flag->data, param);
+        }
+        else if(curr_required < mgr->requred_cnt){
+            const Y_CmdRequred *required = mgr->requred + curr_required;
+            if(!is_satisfies(required->input_type, arg)){
+                log(error_stream, "ERROR: \"%s\" parameter for required param \"%s\" is not satisfied for type \"%s\"\n", arg, required->doc.name, required->input_type->doc.name);
+                return false;
+            }
+            if(required->on_capture) required->on_capture(required->data, arg);
+            curr_required++;
+        }
+        else if(!mgr->rest){
+            log(error_stream, "ERROR: unexpected argument \"%s\"\n", arg);
+            return false;
+        }
+        else if(!((int)cnt_variadic < mgr->rest->max_cout || mgr->rest->max_cout < 0)){
+            log(error_stream, "ERROR: to mutch variadic arguments (max count is %i)\n", mgr->rest->max_cout);
+            return false;   
+        }
+        else if(!is_satisfies(mgr->rest->input_type, arg)){
+            log(error_stream, "ERROR: \"%s\" parameter for variadic param \"%s\" is not satisfied for type \"%s\"\n", arg, mgr->rest->doc.name, mgr->rest->input_type->doc.name);
+            return false;
+        }
+        else{
+            if(mgr->rest->on_capture) mgr->rest->on_capture(mgr->rest->data, arg);
+            cnt_variadic++;
+        }
+    }
+
+    if(curr_required < mgr->requred_cnt){
+        log(error_stream, "ERROR: missing required argument <%s>\n", mgr->requred[curr_required].doc.name);
+        return false;
+    }
+
+    if(mgr->rest && cnt_variadic < mgr->rest->min_cout){
+        log(error_stream, "ERROR: not enough variadic args (min count is %i)", mgr->rest->min_cout);
+        return false;
+    }
+
+    return true;
+}
+
 
 //static
 
@@ -306,3 +395,24 @@ static bool str_overlaps(const char *first, const char *second){
 
     return result;
 }
+
+static Y_CmdFlag *get_flag(Y_CmdMgr *mgr, const char *flag){
+    for (unsigned i = 0; i < mgr->flags_cnt; i++){
+        Y_CmdFlag *f = mgr->flags + i;
+
+        if(!strncmp(f->flag, flag, strlen(flag))){
+            return f;
+        }
+    }
+    return NULL;
+}
+
+static bool is_satisfies(const Y_CmdInputType *type, const char *input){
+    if(input && type && type->is_satisfies){
+        return type->is_satisfies(input);
+    }
+    else{
+        return false;
+    }
+}
+
